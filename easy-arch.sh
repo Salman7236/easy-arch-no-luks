@@ -295,7 +295,7 @@ partprobe "$DISK"
 info_print "Formatting the EFI Partition as FAT32."
 mkfs.fat -F 32 "$EFI" &>/dev/null
 
-BTRFS='/dev/disk/by-partlabel/root'
+BTRFS="/dev/disk/by-partlabel/root"
 
 # Formatting the LUKS Container as BTRFS.
 info_print "Formatting the LUKS container as BTRFS."
