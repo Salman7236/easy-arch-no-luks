@@ -283,7 +283,7 @@ sgdisk -Zo "$DISK" &>/dev/null
 info_print "Creating the partitions on $DISK."
 sgdisk -n1:0:+1G -t1:ef00 -c1:EFI -N2 -t2:8304 -c2:ROOT "$DISK" \
 
-ESP="/dev/disk/by-partlabel/EFI"
+EFI="/dev/disk/by-partlabel/EFI"
 ROOT="/dev/disk/by-partlabel/ROOT"
 
 # Informing the Kernel of the changes.
@@ -292,9 +292,9 @@ partprobe "$DISK"
 
 # Formatting the ESP as FAT32.
 info_print "Formatting the EFI Partition as FAT32."
-mkfs.fat -F 32 "$ESP" &>/dev/null
+mkfs.fat -F 32 "$EFI" &>/dev/null
 
-BTRFS="/dev/null"
+BTRFS="/dev/root"
 
 # Formatting the LUKS Container as BTRFS.
 info_print "Formatting the LUKS container as BTRFS."
