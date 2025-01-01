@@ -284,7 +284,6 @@ info_print "Creating the partitions on $DISK."
 sgdisk -n1:0:+1G -t1:ef00 -c1:EFI -N2 -t2:8304 -c2:ROOT "$DISK" \
 
 EFI="/dev/disk/by-partlabel/EFI"
-ROOT="/dev/disk/by-partlabel/ROOT"
 
 # Informing the Kernel of the changes.
 info_print "Informing the Kernel about the disk changes."
