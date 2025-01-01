@@ -117,26 +117,6 @@ network_installer () {
     esac
 }
 
-# User enters a password for the LUKS Container (function).
-lukspass_selector () {
-    input_print "Please enter a password for the LUKS container (you're not going to see the password): "
-    read -r -s password
-    if [[ -z "$password" ]]; then
-        echo
-        error_print "You need to enter a password for the LUKS Container, please try again."
-        return 1
-    fi
-    echo
-    input_print "Please enter the password for the LUKS container again (you're not going to see the password): "
-    read -r -s password2
-    echo
-    if [[ "$password" != "$password2" ]]; then
-        error_print "Passwords don't match, please try again."
-        return 1
-    fi
-    return 0
-}
-
 # Setting up a password for the user account (function).
 userpass_selector () {
     input_print "Please enter name for a user account (enter empty to not create one): "
@@ -272,9 +252,6 @@ do
     break
 done
 
-# Setting up LUKS password.
-until lukspass_selector; do : ; done
-
 # Setting up the kernel.
 until kernel_selector; do : ; done
 
@@ -304,14 +281,10 @@ sgdisk -Zo "$DISK" &>/dev/null
 
 # Creating a new partition scheme.
 info_print "Creating the partitions on $DISK."
-parted -s "$DISK" \
-    mklabel gpt \
-    mkpart ESP fat32 1MiB 1025MiB \
-    set 1 esp on \
-    mkpart CRYPTROOT 1025MiB 100% \
+sgdisk -n1:0:+1G -t1:ef00 -c1:EFI -N2 -t2:8304 -c2:ROOT "$DISK" \
 
-ESP="/dev/disk/by-partlabel/ESP"
-CRYPTROOT="/dev/disk/by-partlabel/CRYPTROOT"
+ESP="/dev/disk/by-partlabel/EFI"
+ROOT="/dev/disk/by-partlabel/ROOT"
 
 # Informing the Kernel of the changes.
 info_print "Informing the Kernel about the disk changes."
@@ -321,11 +294,7 @@ partprobe "$DISK"
 info_print "Formatting the EFI Partition as FAT32."
 mkfs.fat -F 32 "$ESP" &>/dev/null
 
-# Creating a LUKS Container for the root partition.
-info_print "Creating LUKS Container for the root partition."
-echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" -d - &>/dev/null
-echo -n "$password" | cryptsetup open "$CRYPTROOT" cryptroot -d - 
-BTRFS="/dev/mapper/cryptroot"
+BTRFS="/dev/null"
 
 # Formatting the LUKS Container as BTRFS.
 info_print "Formatting the LUKS container as BTRFS."
@@ -387,11 +356,6 @@ virt_check
 # Setting up the network.
 network_installer
 
-# Configuring /etc/mkinitcpio.conf.
-info_print "Configuring /etc/mkinitcpio.conf."
-cat > /mnt/etc/mkinitcpio.conf <<EOF
-HOOKS=(systemd autodetect keyboard sd-vconsole modconf block sd-encrypt filesystems)
-EOF
 
 # Configuring the system.
 info_print "Configuring the system (timezone, system clock, initramfs, Snapper, rEFInd)."
@@ -427,27 +391,6 @@ arch-chroot /mnt /bin/bash -e <<EOF
 
 EOF
 
-# Setting up rEFInd.
-info_print "Setting up rEFInd."
-UUID=$(blkid -s UUID -o value $CRYPTROOT)
-rm -rf /mnt/boot/EFI/refind/refind.conf
-cat > /mnt/boot/EFI/refind/refind.conf <<EOF
-timeout 20
-scan_all_linux_kernels off
-
-menuentry "Arch Linux" {
-    icon     /EFI/refind/icons/os_arch.png
-    volume   "Arch Linux"
-    loader   /vmlinuz-$kernel
-    initrd   /initramfs-$kernel.img
-    options  "rd.luks.name=$UUID=cryptroot root=$BTRFS rootflags=subvol=@ initrd=/$microcode.img quiet splash"
-    submenuentry "Boot using fallback initramfs" {
-        initrd /initramfs-$kernel-fallback.img
-    }
-}
-EOF
-
-
 # Setting root password.
 info_print "Setting root password."
 echo "root:$rootpass" | arch-chroot /mnt chpasswd
@@ -461,29 +404,11 @@ if [[ -n "$username" ]]; then
     echo "$username:$userpass" | arch-chroot /mnt chpasswd
 fi
 
-# Boot backup hook.
-info_print "Configuring /boot backup when pacman transactions are made."
-mkdir /mnt/etc/pacman.d/hooks
-cat > /mnt/etc/pacman.d/hooks/50-bootbackup.hook <<EOF
-[Trigger]
-Operation = Upgrade
-Operation = Install
-Operation = Remove
-Type = Path
-Target = usr/lib/modules/*/vmlinuz
-
-[Action]
-Depends = rsync
-Description = Backing up /boot...
-When = PostTransaction
-Exec = /usr/bin/rsync -a --delete /boot /.bootbackup
-EOF
 
 # ZRAM configuration.
 info_print "Configuring ZRAM."
 cat > /mnt/etc/systemd/zram-generator.conf <<EOF
 [zram0]
-zram-size = min(ram, 8192)
 EOF
 
 # Pacman eye-candy features.
@@ -491,8 +416,8 @@ info_print "Enabling colours, animations, and parallel downloads for pacman."
 sed -Ei 's/^#(Color)$/\1\nILoveCandy/;s/^#(ParallelDownloads).*/\1 = 10/' /mnt/etc/pacman.conf
 
 # Enabling various services.
-info_print "Enabling Reflector, automatic snapshots, BTRFS scrubbing and systemd-oomd."
-services=(reflector.timer snapper-timeline.timer snapper-cleanup.timer btrfs-scrub@-.timer btrfs-scrub@home.timer btrfs-scrub@var-log.timer btrfs-scrub@\\x2esnapshots.timer systemd-oomd)
+info_print "Enabling Reflector, automatic snapshots and BTRFS scrubbing."
+services=(reflector.timer snapper-timeline.timer snapper-cleanup.timer btrfs-scrub@-.timer btrfs-scrub@home.timer btrfs-scrub@var-log.timer btrfs-scrub@\\x2esnapshots.timer)
 for service in "${services[@]}"; do
     systemctl enable "$service" --root=/mnt &>/dev/null
 done
