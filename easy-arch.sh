@@ -297,7 +297,7 @@ mkfs.fat -F 32 "$EFI" &>/dev/null
 
 BTRFS="/dev/disk/by-partlabel/root"
 
-# Formatting the LUKS Container as BTRFS.
+# Formatting the root as BTRFS.
 info_print "Formatting the LUKS container as BTRFS."
 mkfs.btrfs "$BTRFS" &>/dev/null
 mount "$BTRFS" /mnt
