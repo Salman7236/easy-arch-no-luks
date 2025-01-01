@@ -282,7 +282,7 @@ sgdisk -Zo "$DISK" &>/dev/null
 # Creating a new partition scheme.
 info_print "Creating the partitions on $DISK."
 sgdisk -g "$DISK"
-sgdisk -I -n 1:0:+1G -t 1:ef00 -c 1:'EFI' "$$DISK"
+sgdisk -I -n 1:0:+1G -t 1:ef00 -c 1:'EFI' "$DISK"
 sgdisk -I -n 2:0:0 -t 2:8304 -c 2:'root' "$DISK"
 
 EFI="/dev/disk/by-partlabel/EFI"
