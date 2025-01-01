@@ -322,7 +322,7 @@ chmod 750 /mnt/root
 mount -o "$mountopts",subvol=@snapshots "$BTRFS" /mnt/.snapshots
 mount -o "$mountopts",subvol=@var_pkgs "$BTRFS" /mnt/var/cache/pacman/pkg
 chattr +C /mnt/var/log
-mount "$ESP" /mnt/boot/
+mount "$EFI" /mnt/boot/
 
 # Checking the microcode to install.
 microcode_detector
